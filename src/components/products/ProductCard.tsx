@@ -88,7 +88,10 @@ export default function ProductCard({
 
         <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 z-10 pointer-events-none">
           {product.isNew && <Badge variant="cream">New</Badge>}
-          {product.isFeatured && !product.isNew && <Badge variant="gold">Featured</Badge>}
+          {product.isBestseller && <Badge variant="gold">Bestseller</Badge>}
+          {product.isFeatured && !product.isNew && !product.isBestseller && (
+            <Badge variant="gold">Featured</Badge>
+          )}
         </div>
 
         <button

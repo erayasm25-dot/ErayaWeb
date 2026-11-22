@@ -29,6 +29,8 @@ export interface Product {
   isNew?: boolean;
   isFeatured?: boolean;
   isBestseller?: boolean;
+  /** Display order within the Bestsellers collection (lower = earlier) */
+  bestsellerOrder?: number;
   /** Explicitly marks demo entries until replaced by owner inventory */
   isDemo: boolean;
   images: string[];

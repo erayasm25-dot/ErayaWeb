@@ -14,6 +14,9 @@ import {
   Plus,
   Trash2,
   ShieldCheck,
+  Star,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import Button from "@/components/common/Button";
 import { container, formatPrice, cn } from "@/lib/utils";
@@ -31,7 +34,7 @@ import {
 const field =
   "w-full min-h-[42px] px-3 py-2 bg-white border border-forest-dark/30 text-forest-dark text-sm font-sans focus:outline-none focus:border-forest-dark";
 
-type Tab = "orders" | "products" | "custom" | "settings" | "security";
+type Tab = "orders" | "products" | "bestsellers" | "custom" | "settings" | "security";
 
 interface SecurityLogRow {
   id: number;
@@ -50,6 +53,7 @@ export default function AdminPage() {
 
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [bestsellerIds, setBestsellerIds] = useState<string[]>([]);
   const [customOrders, setCustomOrders] = useState<CustomOrderRecord[]>([]);
   const [settings, setSettings] = useState<AdminOwnerSettings | null>(null);
   const [securityLogs, setSecurityLogs] = useState<SecurityLogRow[]>([]);
@@ -80,7 +84,18 @@ export default function AdminPage() {
       lRes.json(),
     ]);
     if (oData.ok) setOrders(oData.orders);
-    if (pData.ok) setProducts(pData.products);
+    if (pData.ok) {
+      setProducts(pData.products);
+      const sortedBs = [...(pData.products as Product[])]
+        .filter((p) => p.isBestseller)
+        .sort((a, b) => {
+          const ao = a.bestsellerOrder && a.bestsellerOrder > 0 ? a.bestsellerOrder : 999999;
+          const bo = b.bestsellerOrder && b.bestsellerOrder > 0 ? b.bestsellerOrder : 999999;
+          return ao - bo || b.order - a.order;
+        })
+        .map((p) => p.id);
+      setBestsellerIds(sortedBs);
+    }
     if (cData.ok) setCustomOrders(cData.customOrders);
     if (sData.ok) setSettings(sData.settings);
     if (lData.ok) setSecurityLogs(lData.logs);
@@ -191,6 +206,38 @@ export default function AdminPage() {
     setBusyId(null);
   };
 
+  const saveBestsellers = async (nextIds: string[]) => {
+    setBusyId("bestsellers");
+    const res = await fetch("/api/admin/bestsellers", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderedIds: nextIds }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      setBestsellerIds(nextIds);
+      await loadAll();
+      setNotice("Bestsellers collection updated");
+    }
+    setBusyId(null);
+  };
+
+  const moveBestseller = (idx: number, dir: -1 | 1) => {
+    const target = idx + dir;
+    if (target < 0 || target >= bestsellerIds.length) return;
+    const copy = [...bestsellerIds];
+    const [item] = copy.splice(idx, 1);
+    copy.splice(target, 0, item);
+    saveBestsellers(copy);
+  };
+
+  const toggleBestseller = (id: string) => {
+    const next = bestsellerIds.includes(id)
+      ? bestsellerIds.filter((x) => x !== id)
+      : [...bestsellerIds, id];
+    saveBestsellers(next);
+  };
+
   const failedSyncCount = orders.filter(
     (o) => o.sheetsSyncStatus === "FAILED" || o.sheetsSyncStatus === "PENDING_RETRY"
   ).length;
@@ -280,6 +327,7 @@ export default function AdminPage() {
               [
                 ["orders", `Orders (${orders.length})`, ShoppingBag],
                 ["products", `Products (${products.length})`, Package],
+                ["bestsellers", `Bestsellers (${bestsellerIds.length})`, Star],
                 ["custom", `Custom Enquiries (${customOrders.length})`, MessageSquare],
                 ["settings", "Owner Settings & UPI / Sheets", Settings],
                 ["security", "Security Logs", ShieldCheck],
@@ -613,6 +661,113 @@ export default function AdminPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* ───────────── BESTSELLERS TAB ───────────── */}
+          {tab === "bestsellers" && (
+            <div className="space-y-8">
+              <div className="p-6 bg-ivory-200 border border-gold space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="font-serif text-2xl">Selected Bestsellers (Display Order)</h2>
+                    <p className="text-xs text-forest-dark/70 font-sans mt-1">
+                      Changes save immediately to the database and update /bestsellers and the homepage.
+                    </p>
+                  </div>
+                  <a
+                    href="/bestsellers"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs uppercase tracking-[0.14em] underline decoration-gold underline-offset-4"
+                  >
+                    Preview /bestsellers
+                  </a>
+                </div>
+
+                {bestsellerIds.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-forest-dark/70 border border-dashed border-forest-dark/30 font-sans">
+                    No bestsellers selected. Choose products below to add them.
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-gold/30 border border-gold bg-white">
+                    {bestsellerIds.map((id, idx) => {
+                      const prod = products.find((p) => p.id === id);
+                      if (!prod) return null;
+                      return (
+                        <li key={id} className="p-4 flex flex-wrap items-center justify-between gap-4">
+                          <div className="flex items-center gap-4">
+                            <span className="w-8 h-8 rounded-full bg-forest text-cream text-xs font-semibold flex items-center justify-center shrink-0">
+                              {idx + 1}
+                            </span>
+                            <div>
+                              <p className="font-serif text-xl">{prod.name}</p>
+                              <p className="text-xs text-forest-dark/70 font-sans">
+                                {prod.sku} · {prod.categoryName} · {formatPrice(prod.price)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              disabled={idx === 0 || busyId === "bestsellers"}
+                              onClick={() => moveBestseller(idx, -1)}
+                              className="w-9 h-9 flex items-center justify-center border border-forest-dark/30 hover:bg-forest-dark hover:text-cream disabled:opacity-35"
+                              aria-label={`Move ${prod.name} up`}
+                            >
+                              <ArrowUp className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={idx === bestsellerIds.length - 1 || busyId === "bestsellers"}
+                              onClick={() => moveBestseller(idx, 1)}
+                              className="w-9 h-9 flex items-center justify-center border border-forest-dark/30 hover:bg-forest-dark hover:text-cream disabled:opacity-35"
+                              aria-label={`Move ${prod.name} down`}
+                            >
+                              <ArrowDown className="w-4 h-4" />
+                            </button>
+                            <Button
+                              size="sm"
+                              variant="line"
+                              disabled={busyId === "bestsellers"}
+                              onClick={() => toggleBestseller(prod.id)}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="font-serif text-2xl">All Products</h3>
+                <div className="divide-y divide-gold/30 border border-gold bg-ivory-200">
+                  {products.map((p) => {
+                    const selected = bestsellerIds.includes(p.id);
+                    return (
+                      <div key={p.id} className="p-4 flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                          <p className="font-serif text-xl">{p.name}</p>
+                          <p className="text-xs text-forest-dark/70 font-sans">
+                            {p.sku} · {p.categoryName} · {formatPrice(p.price)}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant={selected ? "line" : "solid"}
+                          disabled={busyId === "bestsellers"}
+                          onClick={() => toggleBestseller(p.id)}
+                        >
+                          {selected ? "Remove from Bestsellers" : "Add to Bestsellers"}
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}

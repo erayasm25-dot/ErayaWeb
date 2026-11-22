@@ -268,6 +268,10 @@ function ShopContent() {
   const title =
     filters.cats.length === 1
       ? CATEGORIES.find((c) => c.id === filters.cats[0])?.name
+      : filters.cats.length === 2 &&
+        filters.cats.includes("clay-keychains") &&
+        filters.cats.includes("crochet-keychains")
+      ? "Keychains"
       : "The collection";
 
   const chips: { label: string; remove: () => void }[] = [

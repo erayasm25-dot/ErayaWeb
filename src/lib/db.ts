@@ -59,6 +59,20 @@ async function ensurePg(): Promise<Pool> {
           );
         }
 
+        const mig002 = await client.query(
+          "SELECT version FROM schema_migrations WHERE version = '002_bestseller_order'"
+        );
+        if (mig002.rowCount === 0) {
+          const sql002 = fs.readFileSync(
+            path.join(process.cwd(), "migrations", "002_bestseller_order.sql"),
+            "utf8"
+          );
+          await client.query(sql002);
+          await client.query(
+            "INSERT INTO schema_migrations (version) VALUES ('002_bestseller_order') ON CONFLICT DO NOTHING"
+          );
+        }
+
         // Seed products only if empty
         const { rows: countRows } = await client.query("SELECT COUNT(*)::int AS c FROM products");
         if (countRows[0].c === 0) {
@@ -151,6 +165,7 @@ function getSqlite(): DatabaseSync {
       is_new INTEGER DEFAULT 0,
       is_featured INTEGER DEFAULT 0,
       is_bestseller INTEGER DEFAULT 0,
+      bestseller_order INTEGER NOT NULL DEFAULT 0,
       is_demo INTEGER DEFAULT 0,
       images TEXT NOT NULL DEFAULT '[]',
       description TEXT NOT NULL,
@@ -238,6 +253,11 @@ function getSqlite(): DatabaseSync {
     db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_idempotency ON orders(idempotency_key) WHERE idempotency_key IS NOT NULL;");
   }
 
+  const prodCols = db.prepare("PRAGMA table_info(products)").all() as { name: string }[];
+  if (!prodCols.some((c) => c.name === "bestseller_order")) {
+    db.exec("ALTER TABLE products ADD COLUMN bestseller_order INTEGER NOT NULL DEFAULT 0;");
+  }
+
   const countRow = db.prepare("SELECT COUNT(*) as c FROM products").get() as { c: number };
   const now = new Date().toISOString();
   if (countRow.c === 0) {
@@ -310,6 +330,7 @@ function rowToProduct(row: Record<string, unknown>): Product {
     isNew: Boolean(row.is_new),
     isFeatured: Boolean(row.is_featured),
     isBestseller: Boolean(row.is_bestseller),
+    bestsellerOrder: Number(row.bestseller_order ?? 0),
     isDemo: Boolean(row.is_demo),
     images: parseJsonArr(row.images),
     description: String(row.description),
@@ -408,22 +429,23 @@ export async function upsertProductDb(p: Product): Promise<Product> {
     await pool.query(
       `INSERT INTO products (
         id, slug, sku, name, category, category_name, price, availability, stock_count,
-        is_new, is_featured, is_bestseller, is_demo, images, description, materials,
+        is_new, is_featured, is_bestseller, bestseller_order, is_demo, images, description, materials,
         customisable, tags, sort_order, updated_at
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15,$16::jsonb,$17,$18::jsonb,$19,NOW())
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb,$16,$17::jsonb,$18,$19::jsonb,$20,NOW())
       ON CONFLICT (id) DO UPDATE SET
         slug = EXCLUDED.slug, sku = EXCLUDED.sku, name = EXCLUDED.name,
         category = EXCLUDED.category, category_name = EXCLUDED.category_name,
         price = EXCLUDED.price, availability = EXCLUDED.availability, stock_count = EXCLUDED.stock_count,
         is_new = EXCLUDED.is_new, is_featured = EXCLUDED.is_featured, is_bestseller = EXCLUDED.is_bestseller,
+        bestseller_order = EXCLUDED.bestseller_order,
         is_demo = EXCLUDED.is_demo, images = EXCLUDED.images, description = EXCLUDED.description,
         materials = EXCLUDED.materials, customisable = EXCLUDED.customisable, tags = EXCLUDED.tags,
         sort_order = EXCLUDED.sort_order, updated_at = NOW()`,
       [
         p.id, p.slug, p.sku, p.name, p.category, p.categoryName, p.price, p.availability,
         p.stockCount ?? null, Boolean(p.isNew), Boolean(p.isFeatured), Boolean(p.isBestseller),
-        Boolean(p.isDemo), JSON.stringify(p.images || []), p.description, JSON.stringify(p.materials || []),
-        p.customisable !== false, JSON.stringify(p.tags || []), p.order ?? 0,
+        Number(p.bestsellerOrder ?? 0), Boolean(p.isDemo), JSON.stringify(p.images || []), p.description,
+        JSON.stringify(p.materials || []), p.customisable !== false, JSON.stringify(p.tags || []), p.order ?? 0,
       ]
     );
     return (await getProductByIdDb(p.id))!;
@@ -436,24 +458,84 @@ export async function upsertProductDb(p: Product): Promise<Product> {
   db.prepare(`
     INSERT INTO products (
       id, slug, sku, name, category, category_name, price, availability, stock_count,
-      is_new, is_featured, is_bestseller, is_demo, images, description, materials,
+      is_new, is_featured, is_bestseller, bestseller_order, is_demo, images, description, materials,
       customisable, tags, sort_order, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       slug = excluded.slug, sku = excluded.sku, name = excluded.name,
       category = excluded.category, category_name = excluded.category_name,
       price = excluded.price, availability = excluded.availability, stock_count = excluded.stock_count,
       is_new = excluded.is_new, is_featured = excluded.is_featured, is_bestseller = excluded.is_bestseller,
+      bestseller_order = excluded.bestseller_order,
       is_demo = excluded.is_demo, images = excluded.images, description = excluded.description,
       materials = excluded.materials, customisable = excluded.customisable, tags = excluded.tags,
       sort_order = excluded.sort_order, updated_at = excluded.updated_at
   `).run(
     p.id, p.slug, p.sku, p.name, p.category, p.categoryName, p.price, p.availability,
     p.stockCount ?? null, p.isNew ? 1 : 0, p.isFeatured ? 1 : 0, p.isBestseller ? 1 : 0,
-    p.isDemo ? 1 : 0, JSON.stringify(p.images || []), p.description, JSON.stringify(p.materials || []),
-    p.customisable ? 1 : 0, JSON.stringify(p.tags || []), p.order ?? 0, createdAt, now
+    Number(p.bestsellerOrder ?? 0), p.isDemo ? 1 : 0, JSON.stringify(p.images || []), p.description,
+    JSON.stringify(p.materials || []), p.customisable ? 1 : 0, JSON.stringify(p.tags || []), p.order ?? 0, createdAt, now
   );
   return (await getProductByIdDb(p.id))!;
+}
+
+export async function listBestsellersDb(): Promise<Product[]> {
+  if (usePostgres()) {
+    const pool = await ensurePg();
+    const { rows } = await pool.query(
+      "SELECT * FROM products WHERE is_bestseller = TRUE ORDER BY CASE WHEN bestseller_order > 0 THEN bestseller_order ELSE 999999 END ASC, sort_order DESC, created_at DESC"
+    );
+    return rows.map(rowToProduct);
+  }
+  const db = getSqlite();
+  const rows = db
+    .prepare(
+      "SELECT * FROM products WHERE is_bestseller = 1 ORDER BY CASE WHEN bestseller_order > 0 THEN bestseller_order ELSE 999999 END ASC, sort_order DESC, created_at DESC"
+    )
+    .all() as Record<string, unknown>[];
+  return rows.map(rowToProduct);
+}
+
+export async function saveBestsellersOrderDb(orderedIds: string[]): Promise<Product[]> {
+  if (usePostgres()) {
+    const pool = await ensurePg();
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("UPDATE products SET is_bestseller = FALSE, bestseller_order = 0");
+      for (let i = 0; i < orderedIds.length; i++) {
+        await client.query(
+          "UPDATE products SET is_bestseller = TRUE, bestseller_order = $1, updated_at = NOW() WHERE id = $2",
+          [i + 1, orderedIds[i]]
+        );
+      }
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+    return listBestsellersDb();
+  }
+
+  const db = getSqlite();
+  const now = new Date().toISOString();
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.prepare("UPDATE products SET is_bestseller = 0, bestseller_order = 0").run();
+    const stmt = db.prepare(
+      "UPDATE products SET is_bestseller = 1, bestseller_order = ?, updated_at = ? WHERE id = ?"
+    );
+    for (let i = 0; i < orderedIds.length; i++) {
+      stmt.run(i + 1, now, orderedIds[i]);
+    }
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
+  return listBestsellersDb();
 }
 
 export async function deleteProductDb(id: string): Promise<boolean> {

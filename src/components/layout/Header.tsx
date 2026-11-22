@@ -14,7 +14,7 @@ import { CATEGORIES, CATEGORY_GROUPS, categoriesInGroup } from "@/data/categorie
 import { NAV_ITEMS, catHref, groupHref, INSTAGRAM_URL, INSTAGRAM_HANDLE } from "@/data/navigation";
 import { cn } from "@/lib/utils";
 
-type MenuKey = "shop" | "pipe" | null;
+type MenuKey = "shop" | "keychains" | "pipe" | null;
 
 function CountBadge({ count, bump }: { count: number; bump?: number }) {
   if (count <= 0) return null;
@@ -170,7 +170,11 @@ export default function Header() {
           >
             {NAV_ITEMS.map((item) => {
               const isActive =
-                item.href === "/" ? pathname === "/" : item.href === "/shop" ? pathname.startsWith("/shop") : pathname === item.href;
+                item.href === "/"
+                  ? pathname === "/"
+                  : item.href === "/shop"
+                  ? pathname.startsWith("/shop")
+                  : pathname === item.href;
               const linkCls = cn(
                 "relative text-[13px] xl:text-[14px] tracking-[0.11em] uppercase font-sans py-2.5 transition-colors whitespace-nowrap",
                 isActive ? "text-gold" : "text-cream/90 hover:text-gold"
@@ -276,6 +280,41 @@ export default function Header() {
                         Shop all <ArrowRight className="w-3.5 h-3.5" />
                       </Link>
                     </div>
+                  </div>
+                </div>
+              ) : menu === "keychains" ? (
+                <div className="grid grid-cols-12 gap-10">
+                  <div className="col-span-4">
+                    <p className="text-[11px] tracking-[0.24em] uppercase text-gold mb-3">
+                      Keychains
+                    </p>
+                    <p className="font-serif text-3xl leading-tight text-cream">
+                      Clay &amp; crochet charms made for everyday bags and keys.
+                    </p>
+                    <Link
+                      href={groupHref("keychains")}
+                      onClick={closeNow}
+                      className="inline-flex items-center gap-1.5 mt-5 text-xs uppercase tracking-[0.16em] text-cream hover:text-gold"
+                    >
+                      All Keychains <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                  <div className="col-span-8 grid grid-cols-3 gap-x-8 items-start">
+                    <Link
+                      href={groupHref("keychains")}
+                      onClick={closeNow}
+                      className="group flex items-center gap-3 py-2 text-cream/90 hover:text-cream"
+                    >
+                      <span className="w-10 h-10 shrink-0 rounded-full border border-gold/40 bg-forest flex items-center justify-center text-gold group-hover:border-gold transition-colors">
+                        <CategoryGlyph category="clay-keychains" className="w-6 h-6" />
+                      </span>
+                      <span className="font-serif text-lg leading-tight group-hover:text-gold transition-colors">
+                        All Keychains
+                      </span>
+                    </Link>
+                    {categoriesInGroup("keychains").map((c) => (
+                      <CategoryLink key={c.id} id={c.id} onClick={closeNow} />
+                    ))}
                   </div>
                 </div>
               ) : (

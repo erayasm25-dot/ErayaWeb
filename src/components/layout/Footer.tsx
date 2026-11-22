@@ -34,6 +34,7 @@ export default function Footer() {
             <span className={heading}>Shop</span>
             <ul>
               <li><Link href="/shop" className={link}>All products</Link></li>
+              <li><Link href="/bestsellers" className={link}>Bestsellers</Link></li>
               {CATEGORIES.map((c) => (
                 <li key={c.id}>
                   <Link href={catHref(c.id)} className={link}>{c.name}</Link>

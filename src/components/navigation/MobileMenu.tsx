@@ -91,6 +91,29 @@ export default function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
 
               <nav aria-label="Mobile">
                 <Link href="/" onClick={onClose} className={row}>Home</Link>
+                <Link href="/bestsellers" onClick={onClose} className={row}>Bestsellers</Link>
+
+                {/* Keychains dropdown */}
+                <button
+                  onClick={() => setExpanded(expanded === "keychains" ? null : "keychains")}
+                  aria-expanded={expanded === "keychains"}
+                  className={row}
+                >
+                  Keychains
+                  <ChevronDown className={cn("w-5 h-5 text-gold transition-transform", expanded === "keychains" && "rotate-180")} />
+                </button>
+                {expanded === "keychains" && (
+                  <div className="py-2 pl-2 space-y-1 border-b border-gold/20">
+                    <Link href={groupHref("keychains")} onClick={onClose} className="block py-2 text-[17px] font-serif text-cream/90">
+                      All Keychains
+                    </Link>
+                    {categoriesInGroup("keychains").map((c) => (
+                      <Link key={c.id} href={catHref(c.id)} onClick={onClose} className="block py-2 text-[17px] font-serif text-cream/90">
+                        {c.name}
+                      </Link>
+                    ))}
+                  </div>
+                )}
 
                 {/* Shop accordion */}
                 <button

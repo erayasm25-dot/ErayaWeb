@@ -7,7 +7,14 @@ import { Product } from "@/types/product";
 import { container } from "@/lib/utils";
 
 export default function BestsellersSection({ products }: { products: Product[] }) {
-  const bestsellers = products.filter((p) => p.isBestseller).slice(0, 4);
+  const bestsellers = [...products]
+    .filter((p) => p.isBestseller)
+    .sort((a, b) => {
+      const ao = a.bestsellerOrder && a.bestsellerOrder > 0 ? a.bestsellerOrder : 999999;
+      const bo = b.bestsellerOrder && b.bestsellerOrder > 0 ? b.bestsellerOrder : 999999;
+      return ao - bo || b.order - a.order;
+    })
+    .slice(0, 4);
   if (bestsellers.length === 0) return null;
 
   return (
@@ -20,10 +27,10 @@ export default function BestsellersSection({ products }: { products: Product[] }
             subtitle="Pieces designated by the studio as customer favourites across keychains, bouquets, and glowing diyas."
           />
           <Link
-            href="/shop"
+            href="/bestsellers"
             className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.18em] underline underline-offset-[7px] decoration-gold min-h-[44px]"
           >
-            Explore all pieces <ArrowRight className="w-3.5 h-3.5" />
+            View all bestsellers <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
