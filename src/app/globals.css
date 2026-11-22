@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-forest: #173013;
+  --color-forest-dark: #10250f;
+  --color-botanical: #29452b;
+  --color-cream: #f8e9c5;
+  --color-ivory: #f5f1e7;
+  --color-gold: #b49a70;
+  --color-sage: #a6ad96;
+}
+
+html {
+  scroll-behavior: smooth;
+  background-color: #10250f;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-padding-top: 7rem;
+  overflow-x: hidden;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+::selection {
+  background-color: #b49a70;
+  color: #10250f;
+}
+
+/* Accessible, brand-coloured focus ring (keyboard only) */
+:focus-visible {
+  outline: 2px solid #b49a70;
+  outline-offset: 2px;
+}
+
+/* Fine scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #10250f;
+}
+::-webkit-scrollbar-thumb {
+  background: #b49a70;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #f8e9c5;
+}
+
+@layer utilities {
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  /* Editorial display sizes with deliberate line-height so lines never collide */
+  .display-xl {
+    font-size: clamp(3.25rem, 6.8vw, 6.5rem);
+    line-height: 0.98;
+    letter-spacing: -0.02em;
+  }
+  .display-lg {
+    font-size: clamp(2.5rem, 4.8vw, 4.5rem);
+    line-height: 1.04;
+    letter-spacing: -0.015em;
+  }
+  .display-md {
+    font-size: clamp(2.1rem, 3.8vw, 3.5rem);
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+  }
+}
+
+/* Respect reduced-motion preferences globally */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
